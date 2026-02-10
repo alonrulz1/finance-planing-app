@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Finance Manager</title>
+  </head>
+  <body>
+    <div id="mainContainer">
+      <h1>Finance Manager</h1>
+      
+      <!-- Plan Selection -->
+      <div id="planSelectionSection">
+        <h2>Select or Create a Financial Plan</h2>
+        <div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
+          <select id="ddlPlans">
+            <option value="">-- Select a Plan --</option>
+          </select>
+          <button id="btnRefreshPlans">Refresh</button>
+        </div>
+        
+        <div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
+          <input id="txtNewPlanName" type="text" placeholder="Enter new plan name" />
+          <button id="btnCreatePlan">Create New Plan</button>
+          <button id="btnDeletePlan" disabled>Delete Plan</button>
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
+          <select id="ddlCurrency">
+            <option value="USD">USD ($)</option>
+            <option value="ILS">ILS (₪)</option>
+            <option value="EUR">EUR (€)</option>
+            <option value="GBP">GBP (£)</option>
+            <option value="JPY">JPY (¥)</option>
+          </select>
+          <button id="btnSaveCurrency">Save Currency</button>
+        </div>
+      </div>
+
+      <!-- Tabs Container -->
+      <div id="tabsContainer" style="display: none;">
+        <div class="tabButtons">
+          <button class="tabBtn active" data-tab="incomeTab" id="btnIncomeTab">Income</button>
+          <button class="tabBtn" data-tab="paymentTab" id="btnPaymentTab">Payments</button>
+          <button class="tabBtn" data-tab="cashFlowTab" id="btnCashFlowTab">Cash Flow</button>
+        </div>
+
+        <!-- Income Section -->
+        <div id="incomeTab" class="tabContent active">
+          <h2>Income</h2>
+          <div style="margin-bottom: 15px;">
+            <input id="txtIncomeDescription" type="text" placeholder="Description (e.g., Salary)" />
+            <input id="txtIncomeDate" type="date" />
+            <input id="txtIncomeAmount" type="number" placeholder="Amount" step="0.01" />
+            <button id="btnAddIncome">Add Income</button>
+          </div>
+          <div id="incomeList">
+            <table border="1" cellpadding="5" cellspacing="0" style="width: 100%;">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Description</th>
+                  <th>Amount</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="incomeTableBody">
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Payments Section -->
+        <div id="paymentTab" class="tabContent">
+          <h2>Payments</h2>
+          <div style="margin-bottom: 15px;">
+            <input id="txtPaymentDescription" type="text" placeholder="Description (e.g., Rent)" />
+            <input id="txtPaymentDate" type="date" />
+            <input id="txtPaymentAmount" type="number" placeholder="Amount" step="0.01" />
+            <button id="btnAddPayment">Add Payment</button>
+          </div>
+          <div id="paymentList">
+            <table border="1" cellpadding="5" cellspacing="0" style="width: 100%;">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Description</th>
+                  <th>Amount</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="paymentTableBody">
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Cash Flow Section -->
+        <div id="cashFlowTab" class="tabContent">
+          <h2>Cash Flow Analysis</h2>
+          <div style="margin-bottom: 15px;">
+            <input id="txtInitialBalance" type="number" placeholder="Initial Balance" step="0.01" />
+            <button id="btnSaveInitialBalance">Save Initial Balance</button>
+            <button id="btnShowCashFlow">Show Cash Flow</button>
+          </div>
+
+          <!-- Detailed Table -->
+          <div id="cashFlowTableContainer">
+            <table border="1" cellpadding="5" cellspacing="0" style="width: 100%;">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Description</th>
+                  <th>Type</th>
+                  <th>Amount</th>
+                  <th>Balance</th>
+                </tr>
+              </thead>
+              <tbody id="cashFlowTableBody">
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
