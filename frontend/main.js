@@ -83,7 +83,7 @@ function loadPlans() {
     return;
   }
 
-  window.pywebview.api.get_all_plans().then((plans) => {
+  apiGetAllPlans().then((plans) => {
     console.log("Plans loaded:", plans);
     const ddl = document.getElementById("ddlPlans");
     ddl.innerHTML = '<option value="">-- Select a Plan --</option>';
@@ -113,14 +113,14 @@ function selectPlan() {
     document.getElementById("btnDeletePlan").disabled = false;
     
     // Load the saved initial balance for this plan
-    window.pywebview.api.get_plan_initial_balance(currentPlanId).then((balance) => {
+    apiGetPlanInitialBalance(currentPlanId).then((balance) => {
       document.getElementById("txtInitialBalance").value = balance;
     }).catch((error) => {
       console.error("Error loading initial balance:", error);
     });
 
     // Load the saved currency for this plan
-    window.pywebview.api.get_plan_currency(currentPlanId).then((currency) => {
+    apiGetPlanCurrency(currentPlanId).then((currency) => {
       currentCurrency = currency;
       document.getElementById("ddlCurrency").value = currency;
     }).catch((error) => {
@@ -145,7 +145,7 @@ function createPlan() {
     return;
   }
 
-  window.pywebview.api.create_plan(planName).then((response) => {
+  apiCreatePlan(planName).then((response) => {
     alert(response.message);
     document.getElementById("txtNewPlanName").value = "";
     loadPlans();
@@ -159,7 +159,7 @@ function deletePlan() {
   if (!currentPlanId) return;
   
   if (confirm("Are you sure you want to delete this plan? This action cannot be undone.")) {
-    window.pywebview.api.delete_plan(currentPlanId).then((response) => {
+    apiDeletePlan(currentPlanId).then((response) => {
       alert(response.message);
       currentPlanId = null;
       document.getElementById("ddlPlans").value = "";
@@ -181,7 +181,7 @@ function saveCurrency() {
   const currency = document.getElementById("ddlCurrency").value;
   currentCurrency = currency;
 
-  window.pywebview.api.set_plan_currency(currentPlanId, currency).then((response) => {
+  apiSetPlanCurrency(currentPlanId, currency).then((response) => {
     alert(response.message);
   }).catch((error) => {
     console.error("Error saving currency:", error);
@@ -192,7 +192,7 @@ function saveCurrency() {
 function loadIncomes() {
   if (!currentPlanId) return;
   
-  window.pywebview.api.get_incomes(currentPlanId).then((incomes) => {
+  apiGetIncomes(currentPlanId).then((incomes) => {
     const tbody = document.getElementById("incomeTableBody");
     tbody.innerHTML = "";
     const symbol = currencySymbols[currentCurrency] || '$';
@@ -214,7 +214,7 @@ function loadIncomes() {
 function loadPayments() {
   if (!currentPlanId) return;
   
-  window.pywebview.api.get_payments(currentPlanId).then((payments) => {
+  apiGetPayments(currentPlanId).then((payments) => {
     const tbody = document.getElementById("paymentTableBody");
     tbody.innerHTML = "";
     const symbol = currencySymbols[currentCurrency] || '$';
@@ -248,7 +248,7 @@ function addIncome() {
     return;
   }
 
-  window.pywebview.api.add_income(currentPlanId, description, amount, date).then((response) => {
+  apiAddIncome(currentPlanId, description, amount, date).then((response) => {
     alert(response.message);
     document.getElementById("txtIncomeDescription").value = "";
     document.getElementById("txtIncomeDate").value = "";
@@ -275,7 +275,7 @@ function addPayment() {
     return;
   }
 
-  window.pywebview.api.add_payment(currentPlanId, description, amount, date).then((response) => {
+  apiAddPayment(currentPlanId, description, amount, date).then((response) => {
     alert(response.message);
     document.getElementById("txtPaymentDescription").value = "";
     document.getElementById("txtPaymentDate").value = "";
@@ -289,7 +289,7 @@ function addPayment() {
 
 function deleteIncome(incomeId) {
   if (confirm("Delete this income entry?")) {
-    window.pywebview.api.delete_income(incomeId).then((response) => {
+    apiDeleteIncome(incomeId).then((response) => {
       loadIncomes();
     }).catch((error) => {
       console.error("Error deleting income:", error);
@@ -300,7 +300,7 @@ function deleteIncome(incomeId) {
 
 function deletePayment(paymentId) {
   if (confirm("Delete this payment entry?")) {
-    window.pywebview.api.delete_payment(paymentId).then((response) => {
+    apiDeletePayment(paymentId).then((response) => {
       loadPayments();
     }).catch((error) => {
       console.error("Error deleting payment:", error);
@@ -322,7 +322,7 @@ function saveInitialBalance() {
     return;
   }
 
-  window.pywebview.api.set_plan_initial_balance(currentPlanId, initialBalance).then((response) => {
+  apiSetPlanInitialBalance(currentPlanId, initialBalance).then((response) => {
     alert(response.message);
   }).catch((error) => {
     console.error("Error saving initial balance:", error);
@@ -344,7 +344,7 @@ function calculateCashFlow() {
   }
 
   // Get detailed cash flow
-  window.pywebview.api.get_cash_flow_details(currentPlanId, initialBalance).then((details) => {
+  apiGetCashFlowDetails(currentPlanId, initialBalance).then((details) => {
     const tbody = document.getElementById("cashFlowTableBody");
     tbody.innerHTML = "";
     const symbol = currencySymbols[currentCurrency] || '$';
