@@ -46,3 +46,53 @@ class Api:
 
     def get_cash_flow_details(self, plan_id, initial_balance):
         return self.finance_manager.get_cash_flow_details(plan_id, initial_balance)
+
+    def get_lib_file(self, filename):
+        """Serve files from the libs directory"""
+        import os
+        base_dir = os.path.dirname(os.path.dirname(__file__))
+        frontend_dir = os.path.join(base_dir, 'frontend')
+        filepath = os.path.join(frontend_dir, 'libs', filename)
+        
+        # Security check - ensure the file is within the libs directory
+        if os.path.abspath(filepath).startswith(os.path.abspath(os.path.join(frontend_dir, 'libs'))):
+            if os.path.exists(filepath):
+                with open(filepath, 'r', encoding='utf-8') as f:
+                    return f.read()
+        return None
+
+    def save_excel_file(self, filename, base64_data):
+        """Save an Excel workbook to a file"""
+        import os
+        import base64
+        
+        try:
+            # Ensure filename ends with .xlsx
+            if not filename.endswith('.xlsx'):
+                filename = filename + '.xlsx'
+            
+            # Get default save location (Downloads folder)
+            home_dir = os.path.expanduser("~")
+            downloads_dir = os.path.join(home_dir, "Downloads")
+            
+            # Ensure the Downloads directory exists
+            os.makedirs(downloads_dir, exist_ok=True)
+            
+            save_path = os.path.join(downloads_dir, filename)
+            
+            # Decode base64 data and write to file
+            binary_data = base64.b64decode(base64_data)
+            
+            with open(save_path, 'wb') as f:
+                f.write(binary_data)
+            
+            return {
+                "success": True,
+                "message": f"File saved successfully",
+                "path": save_path
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"Error saving file: {str(e)}"
+            }

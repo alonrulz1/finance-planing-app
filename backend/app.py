@@ -6,6 +6,20 @@ from api import Api
 finance_manager = FinanceManager()
 api = Api(finance_manager)
 
+# Function to handle file serving for libs directory
+def serve_file(filename):
+    """Serve files from the libs directory"""
+    base_dir = os.path.dirname(os.path.dirname(__file__))
+    frontend_dir = os.path.join(base_dir, 'frontend')
+    filepath = os.path.join(frontend_dir, 'libs', filename)
+    
+    # Security check - ensure the file is within the libs directory
+    if os.path.abspath(filepath).startswith(os.path.abspath(os.path.join(frontend_dir, 'libs'))):
+        if os.path.exists(filepath):
+            with open(filepath, 'r', encoding='utf-8') as f:
+                return f.read()
+    return None
+
 # Get the parent directory (project root)
 base_dir = os.path.dirname(os.path.dirname(__file__))
 frontend_dir = os.path.join(base_dir, 'frontend')

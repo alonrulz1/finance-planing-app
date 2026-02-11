@@ -55,6 +55,11 @@ function setEvents() {
   // Cash flow events
   document.getElementById("btnSaveInitialBalance").onclick = saveInitialBalance;
   document.getElementById("btnShowCashFlow").onclick = calculateCashFlow;
+  
+  const exportBtn = document.getElementById("btnExportCashFlow");
+  if (exportBtn) {
+    exportBtn.onclick = exportCashFlow;
+  }
 }
 
 function switchTab(tabName) {
@@ -372,4 +377,53 @@ function calculateCashFlow() {
     console.error("Error getting cash flow details:", error);
     alert("Error getting cash flow details");
   });
+}
+
+function exportCashFlow() {
+  if (!currentPlanId) {
+    alert("Please select a plan first.");
+    return;
+  }
+
+  const initialBalance = parseFloat(document.getElementById("txtInitialBalance").value);
+
+  if (isNaN(initialBalance)) {
+    alert("Please enter a valid initial balance.");
+    return;
+  }
+
+  try {
+    // Load XLSX library first, then proceed with export
+    loadXLSXLibrary().then(() => {
+      apiGetCashFlowDetails(currentPlanId, initialBalance).then((details) => {
+        if (!details || details.length === 0) {
+          alert("No cash flow data to export. Please add some transactions first.");
+          return;
+        }
+        
+        const planName = document.getElementById("ddlPlans").selectedOptions[0].text;
+        const symbol = currencySymbols[currentCurrency] || '$';
+        
+        try {
+          const result = exportCashFlowToExcel(planName, currentCurrency, symbol, details, initialBalance);
+          
+          if (result && result.workbook) {
+            triggerFileDownload(result.workbook, result.defaultFileName);
+          }
+        } catch (error) {
+          console.error("Error exporting:", error);
+          alert("Error exporting: " + error.message);
+        }
+      }).catch((error) => {
+        console.error("Error getting cash flow details:", error);
+        alert("Error getting cash flow details: " + error);
+      });
+    }).catch((error) => {
+      console.error("Error loading XLSX library:", error);
+      alert("Error loading XLSX library: " + error);
+    });
+  } catch (error) {
+    console.error("Export error:", error);
+    alert("Error during export: " + error.message);
+  }
 }
