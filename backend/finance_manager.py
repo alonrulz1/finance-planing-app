@@ -1,9 +1,13 @@
 import sqlite3
+import os
 
 
 class FinanceManager:
     def __init__(self):
-        self.db_path = "finance_plans.db"
+        # Get the data folder path
+        base_dir = os.path.dirname(os.path.dirname(__file__))
+        data_dir = os.path.join(base_dir, 'data')
+        self.db_path = os.path.join(data_dir, 'finance_plans.db')
         self._initialize_database()
 
     def _initialize_database(self):

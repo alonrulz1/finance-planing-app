@@ -6,21 +6,23 @@ from api import Api
 finance_manager = FinanceManager()
 api = Api(finance_manager)
 
-base_dir = os.path.dirname(__file__)
+# Get the parent directory (project root)
+base_dir = os.path.dirname(os.path.dirname(__file__))
+frontend_dir = os.path.join(base_dir, 'frontend')
 
-html_file = os.path.join(base_dir, 'index.html')
+html_file = os.path.join(frontend_dir, 'index.html')
 with open(html_file, 'r', encoding='utf-8') as f:
     html_content = f.read()
 
-js_file = os.path.join(base_dir, 'main.js')
+js_file = os.path.join(frontend_dir, 'main.js')
 with open(js_file, 'r', encoding='utf-8') as f:
     js_content_main = f.read()
 
-js_file = os.path.join(base_dir, 'apiUtil.js')
+js_file = os.path.join(frontend_dir, 'apiUtil.js')
 with open(js_file, 'r', encoding='utf-8') as f:
     js_content_api = f.read()
 
-css_file = os.path.join(base_dir, 'style.css')
+css_file = os.path.join(frontend_dir, 'style.css')
 with open(css_file, 'r', encoding='utf-8') as f:
     css_content = f.read()
 
