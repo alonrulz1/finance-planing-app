@@ -68,18 +68,18 @@ function apiDeleteIncome(incomeId) {
   return window.pywebview.api.delete_income(incomeId);
 }
 
-function apiGetPayments(planId) {
+function apiGetPayments(planId, month = null) {
   if (!window.pywebview || !window.pywebview.api) {
     return Promise.reject("API not available yet");
   }
-  return window.pywebview.api.get_payments(planId);
+  return window.pywebview.api.get_payments(planId, month);
 }
 
-function apiAddPayment(planId, description, amount, date) {
+function apiAddPayment(planId, description, amount, date, subtype = 'regular', month = null) {
   if (!window.pywebview || !window.pywebview.api) {
     return Promise.reject("API not available yet");
   }
-  return window.pywebview.api.add_payment(planId, description, amount, date);
+  return window.pywebview.api.add_payment(planId, description, amount, date, subtype, month);
 }
 
 function apiDeletePayment(paymentId) {
@@ -89,11 +89,32 @@ function apiDeletePayment(paymentId) {
   return window.pywebview.api.delete_payment(paymentId);
 }
 
-function apiGetCashFlowDetails(planId, initialBalance) {
+function apiGetCashFlowDetails(planId, initialBalance, month = null) {
   if (!window.pywebview || !window.pywebview.api) {
     return Promise.reject("API not available yet");
   }
-  return window.pywebview.api.get_cash_flow_details(planId, initialBalance);
+  return window.pywebview.api.get_cash_flow_details(planId, initialBalance, month);
+}
+
+function apiGetMonthlyPlanMonths(planId) {
+  if (!window.pywebview || !window.pywebview.api) {
+    return Promise.reject("API not available yet");
+  }
+  return window.pywebview.api.get_monthly_plan_months(planId);
+}
+
+function apiActivateMonth(planId, month) {
+  if (!window.pywebview || !window.pywebview.api) {
+    return Promise.reject("API not available yet");
+  }
+  return window.pywebview.api.activate_month(planId, month);
+}
+
+function apiCopyRegularTransactions(planId, fromMonth, toMonth) {
+  if (!window.pywebview || !window.pywebview.api) {
+    return Promise.reject("API not available yet");
+  }
+  return window.pywebview.api.copy_regular_transactions(planId, fromMonth, toMonth);
 }
 
 // Load XLSX library from backend API

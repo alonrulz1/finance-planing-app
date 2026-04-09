@@ -2,8 +2,17 @@ class Api:
     def __init__(self, finance_manager):
         self.finance_manager = finance_manager
 
-    def create_plan(self, name):
-        return self.finance_manager.create_plan(name)
+    def create_plan(self, name, plan_type='custom'):
+        return self.finance_manager.create_plan(name, plan_type)
+
+    def get_monthly_plan_months(self, plan_id):
+        return self.finance_manager.get_monthly_plan_months(plan_id)
+
+    def activate_month(self, plan_id, month):
+        return self.finance_manager.activate_month(plan_id, month)
+
+    def copy_regular_transactions(self, plan_id, from_month, to_month):
+        return self.finance_manager.copy_regular_transactions(plan_id, from_month, to_month)
 
     def get_all_plans(self):
         return self.finance_manager.get_all_plans()
@@ -20,17 +29,17 @@ class Api:
     def set_plan_currency(self, plan_id, currency):
         return self.finance_manager.set_plan_currency(plan_id, currency)
 
-    def add_income(self, plan_id, description, amount, date):
-        return self.finance_manager.add_income(plan_id, description, amount, date)
+    def add_income(self, plan_id, description, amount, date, subtype='regular', month=None):
+        return self.finance_manager.add_income(plan_id, description, amount, date, subtype, month)
 
-    def add_payment(self, plan_id, description, amount, date):
-        return self.finance_manager.add_payment(plan_id, description, amount, date)
+    def add_payment(self, plan_id, description, amount, date, subtype='regular', month=None):
+        return self.finance_manager.add_payment(plan_id, description, amount, date, subtype, month)
 
     def get_incomes(self, plan_id):
         return self.finance_manager.get_incomes(plan_id)
 
-    def get_payments(self, plan_id):
-        return self.finance_manager.get_payments(plan_id)
+    def get_payments(self, plan_id, month=None):
+        return self.finance_manager.get_payments(plan_id, month)
 
     def delete_plan(self, plan_id):
         return self.finance_manager.delete_plan(plan_id)
@@ -41,11 +50,14 @@ class Api:
     def delete_payment(self, payment_id):
         return self.finance_manager.delete_payment(payment_id)
 
+    def cleanup_duplicate_monthly_plans(self):
+        return self.finance_manager.cleanup_duplicate_monthly_plans()
+
     def calculate_cash_flow(self, plan_id, initial_balance):
         return self.finance_manager.calculate_cash_flow(plan_id, initial_balance)
 
-    def get_cash_flow_details(self, plan_id, initial_balance):
-        return self.finance_manager.get_cash_flow_details(plan_id, initial_balance)
+    def get_cash_flow_details(self, plan_id, initial_balance, month=None):
+        return self.finance_manager.get_cash_flow_details(plan_id, initial_balance, month)
 
     def get_lib_file(self, filename):
         """Serve files from the libs directory"""
