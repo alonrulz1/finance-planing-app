@@ -68,7 +68,6 @@ function initializeEventListeners() {
   // Plan management events
   document.getElementById("btnCreatePlan").onclick = createPlan;
   document.getElementById("btnDeletePlan").onclick = deletePlan;
-  document.getElementById("btnRefreshPlans").onclick = loadPlans;
   document.getElementById("ddlPlans").onchange = selectPlan;
   
   // Plan configuration events
