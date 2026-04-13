@@ -1,52 +1,79 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
   <head>
     <meta charset="UTF-8" />
     <title>Finance Manager</title>
-    <script src="libs/xlsx.full.min.js"></script>
+    <!-- Scripts are injected by app.py -->
   </head>
   <body>
     <div id="mainContainer">
       <h1>Finance Manager</h1>
-      
+
       <!-- Plan Selection -->
       <div id="planSelectionSection">
         <h2>Select or Create a Financial Plan</h2>
-        
+
         <!-- Plan Type Toggle -->
-        <div style="display: flex; gap: 10px; margin-bottom: 20px; align-items: center;">
+        <div
+          style="
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            align-items: center;
+          "
+        >
           <label>Plan Type:</label>
           <select id="ddlPlanType">
             <option value="custom">Custom</option>
             <option value="monthly">Monthly</option>
           </select>
         </div>
-        
-        <div id="planSelectionContainer" style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
-          <div id="customPlanSelection" style="display: flex; gap: 10px; flex-wrap: wrap;">
+
+        <div
+          id="planSelectionContainer"
+          style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap"
+        >
+          <div
+            id="customPlanSelection"
+            style="display: flex; gap: 10px; flex-wrap: wrap"
+          >
             <select id="ddlPlans">
               <option value="">-- Select a Plan --</option>
             </select>
             <button id="btnRefreshPlans">Refresh</button>
           </div>
-          <div id="monthlyPlanSelection" style="display: none; gap: 10px; flex-wrap: wrap;">
+          <div
+            id="monthlyPlanSelection"
+            style="display: none; gap: 10px; flex-wrap: wrap"
+          >
             <select id="ddlMonths">
               <option value="">-- Select Month --</option>
             </select>
           </div>
         </div>
-        
-        <div id="customPlanControls" style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
-          <input id="txtNewPlanName" type="text" placeholder="Enter new plan name" />
+
+        <div
+          id="customPlanControls"
+          style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap"
+        >
+          <input
+            id="txtNewPlanName"
+            type="text"
+            placeholder="Enter new plan name"
+          />
           <button id="btnCreatePlan">Create New Plan</button>
           <button id="btnDeletePlan" disabled>Delete Plan</button>
         </div>
-        <div id="monthlyPlanControls" style="display: none; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
+        <div
+          id="monthlyPlanControls"
+          style="display: none; gap: 10px; margin-bottom: 20px; flex-wrap: wrap"
+        >
           <button id="btnStartMonth">Start Month</button>
         </div>
 
-
-        <div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
+        <div
+          style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap"
+        >
           <select id="ddlCurrency">
             <option value="USD">USD ($)</option>
             <option value="ILS">ILS (₪)</option>
@@ -59,17 +86,38 @@
       </div>
 
       <!-- Finance Manager Container -->
-      <div id="financeContainer" style="display: none;">
+      <div id="financeContainer" style="display: none">
         <!-- Balance Summary -->
-        <div style="margin-bottom: 20px; padding: 15px; border: 2px solid #ccc; border-radius: 5px; background-color: #f9f9f9;">
+        <div
+          style="
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 2px solid #ccc;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+          "
+        >
           <h2>Balance Summary</h2>
-          <div style="display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
+          <div
+            style="
+              display: flex;
+              gap: 20px;
+              align-items: center;
+              flex-wrap: wrap;
+            "
+          >
             <div>
               <label>Initial Balance:</label>
-              <input id="txtInitialBalance" type="number" placeholder="Initial Balance" step="0.01" style="width: 120px;" />
+              <input
+                id="txtInitialBalance"
+                type="number"
+                placeholder="Initial Balance"
+                step="0.01"
+                style="width: 120px"
+              />
               <button id="btnSaveInitialBalance">Save</button>
             </div>
-            <div style="font-size: 18px; font-weight: bold;">
+            <div style="font-size: 18px; font-weight: bold">
               Current Balance: <span id="currentBalanceDisplay">$0.00</span>
             </div>
             <button id="btnExportCashFlow">Export to Excel</button>
@@ -77,42 +125,71 @@
         </div>
 
         <!-- Add Transaction Form -->
-        <div style="margin-bottom: 20px; padding: 15px; border: 2px solid #ccc; border-radius: 5px; background-color: #f9f9f9;">
+        <div
+          style="
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 2px solid #ccc;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+          "
+        >
           <h2>Add Transaction</h2>
-          <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+          <div
+            style="
+              display: flex;
+              gap: 10px;
+              align-items: center;
+              flex-wrap: wrap;
+            "
+          >
             <select id="ddlTransactionType">
               <option value="income">Income</option>
               <option value="payment">Expense</option>
             </select>
-            <select id="ddlTransactionSubtype" style="display: none;">
+            <select id="ddlTransactionSubtype" style="display: none">
               <option value="regular">Regular</option>
               <option value="temp">Temporary</option>
             </select>
-            <input id="txtTransactionDescription" type="text" placeholder="Description" style="width: 200px;" />
+            <input
+              id="txtTransactionDescription"
+              type="text"
+              placeholder="Description"
+              style="width: 200px"
+            />
             <input id="txtTransactionDate" type="date" />
-            <input id="txtTransactionAmount" type="number" placeholder="Amount" step="0.01" style="width: 120px;" />
+            <input
+              id="txtTransactionAmount"
+              type="number"
+              placeholder="Amount"
+              step="0.01"
+              style="width: 120px"
+            />
             <button id="btnAddTransaction">Add Transaction</button>
           </div>
         </div>
 
         <!-- All Transactions Table -->
-        <div style="margin-top: 20px;">
+        <div style="margin-top: 20px">
           <h2>All Transactions</h2>
           <div id="transactionTableContainer">
-            <table border="1" cellpadding="5" cellspacing="0" style="width: 100%;">
+            <table
+              border="1"
+              cellpadding="5"
+              cellspacing="0"
+              style="width: 100%"
+            >
               <thead>
-                <tr>
+                <tr id="tableHeaderRow">
                   <th>Date</th>
                   <th>Description</th>
                   <th>Type</th>
-                  <th>Subtype</th>
                   <th>Amount</th>
                   <th>Balance</th>
                   <th>Action</th>
                 </tr>
               </thead>
-              <tbody id="transactionTableBody">
-              </tbody>
+              <tbody id="transactionTableBody"></tbody>
             </table>
           </div>
         </div>

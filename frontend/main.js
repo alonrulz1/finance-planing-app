@@ -1,8 +1,8 @@
-let currentPlanId = null;
-let currentPlanType = 'custom';
-let currentMonth = null;
-let currentCurrency = 'USD';
-let currencySymbols = {
+// ============================================================================
+// Global Constants and Configuration
+// ============================================================================
+
+const CURRENCY_SYMBOLS = {
   'USD': '$',
   'ILS': '₪',
   'EUR': '€',
@@ -10,215 +10,389 @@ let currencySymbols = {
   'JPY': '¥'
 };
 
-// Function to format date to Israeli format (dd-mm-yyyy)
-function formatDateToIsraeli(dateString) {
-  if (!dateString) return '';
-  const date = new Date(dateString);
-  const day = String(date.getDate()).padStart(2, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const year = date.getFullYear();
-  return `${day}-${month}-${year}`;
-}
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"
+];
 
-// Function to parse Israeli date format (dd-mm-yyyy) to ISO format
-function parseIsraeliDate(israeliDateString) {
-  if (!israeliDateString) return '';
-  const parts = israeliDateString.split('-');
-  if (parts.length !== 3) return israeliDateString;
-  const day = parts[0];
-  const month = parts[1];
-  const year = parts[2];
-  return `${year}-${month}-${day}`;
-}
-
-window.addEventListener('pywebviewready', function() {
-  console.log('pywebview ready');
-  setEvents();
-  loadPlans();
-});
-
-// Fallback in case pywebviewready doesn't fire
-window.onload = function() {
-  console.log('window loaded');
-  setEvents();
-  if (window.pywebview && window.pywebview.api) {
-    loadPlans();
-  } else {
-    // Wait a bit for the API to be available
-    setTimeout(function() {
-      if (window.pywebview && window.pywebview.api) {
-        loadPlans();
-      }
-    }, 500);
-  }
+const PLAN_TYPES = {
+  CUSTOM: 'custom',
+  MONTHLY: 'monthly'
 };
 
-function setEvents() {
-  // Plan events
+const TRANSACTION_TYPES = {
+  INCOME: 'income',
+  PAYMENT: 'payment'
+};
+
+const TRANSACTION_SUBTYPES = {
+  REGULAR: 'regular'
+};
+
+const ICONS = {
+  ACTIVE: '🟢',
+  INACTIVE: '🔴'
+};
+
+// ============================================================================
+// Global State Management
+// ============================================================================
+
+let currentPlanId = null;
+let currentPlanType = 'custom'; // Default to custom plan type
+let currentCurrency = 'USD';
+
+// ============================================================================
+// Application Initialization
+// ============================================================================
+
+/**
+ * Initialize the application
+ */
+function initializeApp() {
+  initializeEventListeners();
+  loadPlans();
+}
+
+/**
+ * Wait for PyWebView API to be available, then initialize
+ */
+window.addEventListener('pywebviewready', function() {
+  initializeApp();
+});
+
+/**
+ * Set up all event listeners for the application
+ */
+function initializeEventListeners() {
+  // Plan management events
   document.getElementById("btnCreatePlan").onclick = createPlan;
   document.getElementById("btnDeletePlan").onclick = deletePlan;
   document.getElementById("btnRefreshPlans").onclick = loadPlans;
   document.getElementById("ddlPlans").onchange = selectPlan;
+  
+  // Plan configuration events
   document.getElementById("btnSaveCurrency").onclick = saveCurrency;
+  document.getElementById("btnSaveInitialBalance").onclick = saveInitialBalance;
   document.getElementById("ddlPlanType").onchange = onPlanTypeChange;
+  
+  // Monthly plan events
   document.getElementById("ddlMonths").onchange = onMonthChange;
   document.getElementById("btnStartMonth").onclick = startMonth;
   
   // Transaction events
   document.getElementById("btnAddTransaction").onclick = addTransaction;
   
-  // Cash flow events
-  document.getElementById("btnSaveInitialBalance").onclick = saveInitialBalance;
-  
+  // Export events
   const exportBtn = document.getElementById("btnExportCashFlow");
   if (exportBtn) {
     exportBtn.onclick = exportCashFlow;
   }
+  
+  // Initialize table headers (guard against missing PLAN_TYPES)
+  if (typeof PLAN_TYPES !== 'undefined') {
+    updateTableHeaders();
+  }
 }
 
+
+
+// ============================================================================
+// Balance and Transaction Display
+// ============================================================================
+
+/**
+ * Update the current balance display and transaction table
+ */
 function updateBalanceDisplay() {
-  const initialBalance = parseFloat(document.getElementById("txtInitialBalance").value) || 0;
+  const initialBalance = parseFloat(getInputValue("txtInitialBalance")) || 0;
   
   if (!currentPlanId) {
-    document.getElementById("currentBalanceDisplay").textContent = '$0.00';
+    setElementText("currentBalanceDisplay", formatCurrencyDisplay(0));
     return;
   }
 
   // Get detailed cash flow to calculate current balance
-  apiGetCashFlowDetails(currentPlanId, initialBalance).then((details) => {
-    const symbol = currencySymbols[currentCurrency] || '$';
-    
+  apiGetCashFlowDetails(currentPlanId, initialBalance, getCurrentSelectedMonth()).then((details) => {
     if (details && details.length > 0) {
       const lastTransaction = details[details.length - 1];
-      document.getElementById("currentBalanceDisplay").textContent = `${symbol}${lastTransaction.balance.toFixed(2)}`;
-      
-      // Update the transaction table
+      setElementText("currentBalanceDisplay", formatCurrencyDisplay(lastTransaction.balance));
       updateTransactionTable(details);
     } else {
-      document.getElementById("currentBalanceDisplay").textContent = `${symbol}${initialBalance.toFixed(2)}`;
-      document.getElementById("transactionTableBody").innerHTML = `<td colspan="6" style="text-align: center;">No transactions</td>`;
+      setElementText("currentBalanceDisplay", formatCurrencyDisplay(initialBalance));
+      const colspanValue = currentPlanType === PLAN_TYPES.MONTHLY ? 7 : 6;
+      showTableNoData("transactionTableBody", colspanValue, "No transactions");
     }
   }).catch((error) => {
     console.error("Error updating balance display:", error);
   });
 }
 
+/**
+ * Format a number as currency with appropriate symbol
+ * @param {number} amount - The amount to format
+ * @returns {string} Formatted currency string
+ */
+function formatCurrencyDisplay(amount) {
+  const symbol = CURRENCY_SYMBOLS[currentCurrency] || '$';
+  return `${symbol}${amount.toFixed(2)}`;
+}
+
+/**
+ * Get the currently selected month (for monthly plans)
+ * @returns {string|null} The selected month or null if not applicable
+ */
+function getCurrentSelectedMonth() {
+  if (currentPlanType === PLAN_TYPES.MONTHLY) {
+    return getDropdownValue("ddlMonths");
+  }
+  return null;
+}
+
+/**
+ * Update transaction table with details
+ * @param {Array} details - Array of transaction detail objects
+ */
+function updateTransactionTable(details) {
+  clearTableBody("transactionTableBody");
+  const symbol = CURRENCY_SYMBOLS[currentCurrency] || '$';
+
+  if (details && details.length > 0) {
+    details.forEach((transaction) => {
+      const row = insertTableRow("transactionTableBody");
+      
+      const balanceClass = transaction.balance < 0 ? "negative-balance" : "positive-balance";
+      const amountClass = transaction.type === TRANSACTION_TYPES.INCOME ? "income-amount" : "payment-amount";
+      const amountDisplay = transaction.type === TRANSACTION_TYPES.INCOME 
+        ? `+${symbol}${transaction.amount.toFixed(2)}` 
+        : `-${symbol}${transaction.amount.toFixed(2)}`;
+      const typeDisplay = transaction.type === TRANSACTION_TYPES.INCOME ? "Income" : "Expense";
+      const subtypeDisplay = transaction.subtype ? capitalizeString(transaction.subtype) : "";
+      const formattedDate = formatDateToIsraeli(transaction.date);
+      
+      // Build row HTML based on plan type
+      let rowHTML = `
+        <td>${formattedDate}</td>
+        <td>${transaction.description}</td>
+        <td>${typeDisplay}</td>`;
+      
+      // Only add subtype column for monthly plans
+      if (currentPlanType === PLAN_TYPES.MONTHLY) {
+        rowHTML += `<td>${subtypeDisplay}</td>`;
+      }
+      
+      rowHTML += `
+        <td class="${amountClass}">${amountDisplay}</td>
+        <td class="${balanceClass}">${symbol}${transaction.balance.toFixed(2)}</td>
+        <td><button onclick="deleteTransaction(${transaction.id}, '${transaction.type}')">Delete</button></td>
+      `;
+      
+      row.innerHTML = rowHTML;
+    });
+  }
+  
+  // Update table headers dynamically
+  updateTableHeaders();
+}
+
+/**
+ * Capitalize first letter of a string
+ * @param {string} str - The string to capitalize
+ * @returns {string} Capitalized string
+ */
+function capitalizeString(str) {
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+/**
+ * Update table headers based on current plan type
+ */
+function updateTableHeaders() {
+  const thead = document.querySelector("table thead tr");
+  if (!thead) return;
+  
+  // Clear existing headers
+  thead.innerHTML = '';
+  
+  // Add standard columns
+  const headerCells = ["Date", "Description", "Type"];
+  
+  // Add subtype only for monthly plans (guard against missing PLAN_TYPES)
+  if (typeof PLAN_TYPES !== 'undefined' && currentPlanType === PLAN_TYPES.MONTHLY) {
+    headerCells.push("Subtype");
+  }
+  
+  // Add remaining columns
+  headerCells.push("Amount", "Balance", "Action");
+  
+  // Create header cells
+  headerCells.forEach(headerText => {
+    const th = document.createElement("th");
+    th.textContent = headerText;
+    thead.appendChild(th);
+  });
+}
+
+
+
+// ============================================================================
+// Plan Type Management
+// ============================================================================
+
+/**
+ * Handle plan type change (between custom and monthly)
+ */
 function onPlanTypeChange() {
   console.log("=== onPlanTypeChange START ===");
-  const planType = document.getElementById("ddlPlanType").value;
+  const planType = getDropdownValue("ddlPlanType");
   console.log("Plan type changed to:", planType);
   
-  // Update the currentPlanType variable
   currentPlanType = planType;
-  console.log("Updated currentPlanType to:", currentPlanType);
   
-  const customPlanSelection = document.getElementById("customPlanSelection");
-  const monthlyPlanSelection = document.getElementById("monthlyPlanSelection");
-  const customPlanControls = document.getElementById("customPlanControls");
-  const monthlyPlanControls = document.getElementById("monthlyPlanControls");
-  const subtypeDropdown = document.getElementById("ddlTransactionSubtype");
-  
-  if (planType === "monthly") {
-    console.log("Switching to monthly mode - hiding custom controls, showing monthly controls");
-    // Hide custom plan controls, show monthly plan controls
-    customPlanSelection.style.display = "none";
-    monthlyPlanSelection.style.display = "block";
-    customPlanControls.style.display = "none";
-    monthlyPlanControls.style.display = "block";
-    subtypeDropdown.style.display = "inline-block";
-    generateMonthOptions(); // Generate month options when switching to monthly
-    
-    // Auto-select first monthly plan if no plan is selected
-    if (!currentPlanId) {
-      console.log("No plan selected, looking for first monthly plan...");
-      apiGetAllPlans().then((plans) => {
-        const monthlyPlan = plans.find(p => p.name.includes("Monthly Plan"));
-        if (monthlyPlan) {
-          console.log("Found monthly plan:", monthlyPlan);
-          currentPlanId = monthlyPlan.id;
-          document.getElementById("ddlPlans").value = monthlyPlan.id;
-        }
-        
-        console.log("About to call loadMonthlyMonths...");
-        loadMonthlyMonths(); // Load month data to show icons
-        console.log("Called loadMonthlyMonths");
-      }).catch((error) => {
-        console.error("Error getting plans:", error);
-      });
-    } else {
-      console.log("About to call loadMonthlyMonths...");
-      loadMonthlyMonths(); // Load month data to show icons
-      console.log("Called loadMonthlyMonths");
-    }
+  if (planType === PLAN_TYPES.MONTHLY) {
+    enableMonthlyMode();
   } else {
-    console.log("Switching to custom mode - showing custom controls, hiding monthly controls");
-    // Show custom plan controls, hide monthly plan controls
-    customPlanSelection.style.display = "block";
-    monthlyPlanSelection.style.display = "none";
-    customPlanControls.style.display = "block";
-    monthlyPlanControls.style.display = "none";
-    subtypeDropdown.style.display = "none";
+    enableCustomMode();
   }
+  
   console.log("=== onPlanTypeChange END ===");
 }
 
+/**
+ * Switch UI to monthly plan mode
+ */
+function enableMonthlyMode() {
+  console.log("Switching to monthly mode");
+  
+  setElementVisibility("customPlanSelection", false);
+  setElementVisibility("monthlyPlanSelection", true);
+  setElementVisibility("customPlanControls", false);
+  setElementVisibility("monthlyPlanControls", true);
+  
+  document.getElementById("ddlTransactionSubtype").style.display = "inline-block";
+  
+  // Generate month options
+  populateMonthDropdown();
+  
+  // Auto-select first monthly plan if no plan is selected
+  if (!currentPlanId) {
+    selectFirstMonthlyPlan();
+  } else {
+    loadMonthlyMonths();
+  }
+}
+
+/**
+ * Switch UI to custom plan mode
+ */
+function enableCustomMode() {
+  console.log("Switching to custom mode");
+  
+  setElementVisibility("customPlanSelection", true);
+  setElementVisibility("monthlyPlanSelection", false);
+  setElementVisibility("customPlanControls", true);
+  setElementVisibility("monthlyPlanControls", false);
+  
+  document.getElementById("ddlTransactionSubtype").style.display = "none";
+  
+  // Auto-select first custom plan if no plan is selected
+  if (!currentPlanId) {
+    selectFirstCustomPlan();
+  }
+}
+
+/**
+ * Populate month dropdown with all months
+ */
+function populateMonthDropdown() {
+  console.log("Generating month options...");
+  populateDropdown("ddlMonths", MONTHS, "-- Select Month --");
+}
+
+/**
+ * Find and select first monthly plan
+ */
+function selectFirstMonthlyPlan() {
+  console.log("No plan selected, looking for first monthly plan...");
+  apiGetAllPlans().then((plans) => {
+    const monthlyPlan = plans.find(p => p.name.includes("Monthly Plan"));
+    if (monthlyPlan) {
+      console.log("Found monthly plan:", monthlyPlan);
+      currentPlanId = monthlyPlan.id;
+      setDropdownValue("ddlPlans", monthlyPlan.id);
+    }
+    loadMonthlyMonths();
+  }).catch((error) => {
+    console.error("Error getting plans:", error);
+  });
+}
+
+/**
+ * Find and select first custom plan
+ */
+function selectFirstCustomPlan() {
+  console.log("No plan selected, looking for first custom plan...");
+  apiGetAllPlans().then((plans) => {
+    const customPlan = plans.find(p => !p.name.includes("Monthly Plan"));
+    if (customPlan) {
+      console.log("Found custom plan:", customPlan);
+      currentPlanId = customPlan.id;
+      setDropdownValue("ddlPlans", customPlan.id);
+    }
+  }).catch((error) => {
+    console.error("Error getting plans:", error);
+  });
+}
+
+
+
+// ============================================================================
+// Monthly Plan Management
+// ============================================================================
+
+/**
+ * Handle month selection change
+ */
 function onMonthChange() {
-  const selectedMonth = document.getElementById("ddlMonths").value;
+  const selectedMonth = getDropdownValue("ddlMonths");
   if (!selectedMonth) return;
   
-  // Get the selected option using selectedOptions property instead of querySelector
-  const selectedOption = document.getElementById("ddlMonths").selectedOptions[0];
-  if (!selectedOption) return;
+  const planId = getSelectedOptionDataAttribute("ddlMonths", "plan-id");
+  const isActive = getSelectedOptionDataAttribute("ddlMonths", "is-active") === 'true';
   
-  const planId = selectedOption.getAttribute('data-plan-id');
-  const isActive = selectedOption.getAttribute('data-is-active') === 'true';
-  
-  console.log("Month changed to:", selectedMonth);
-  console.log("Selected option:", selectedOption);
-  console.log("Plan ID from data attribute:", planId);
-  console.log("Is Active from data attribute:", isActive);
-  console.log("Current currentPlanId before change:", currentPlanId);
+  console.log("Month changed to:", selectedMonth, "- Active:", isActive);
   
   if (!planId) {
-    console.log("No plan associated with this month");
-    // No plan associated with this month
-    document.getElementById("transactionTableBody").innerHTML = '<td colspan="7" style="text-align: center;">Please start this month first to add transactions</td>';
-    updateBalanceDisplay();
-    
-    // Hide transaction form
-    const transactionForm = document.querySelector("div[style*='Add Transaction']");
-    if (transactionForm) {
-      transactionForm.style.display = "none";
-    }
+    showMonthNotStartedMessage();
     return;
   }
   
-  // Set currentPlanId if different
+  // Update currentPlanId if different
   if (planId !== currentPlanId.toString()) {
-    console.log("Updating currentPlanId from", currentPlanId, "to", planId);
     currentPlanId = parseInt(planId);
   }
   
   // Load transactions based on whether month is active
   if (isActive) {
-    console.log("Month is active, calling loadTransactions with active status");
     loadTransactions(true);
   } else {
-    console.log("Month is not active, hiding transaction components");
-    // Clear transaction table and show message
-    document.getElementById("transactionTableBody").innerHTML = '<td colspan="7" style="text-align: center;">Please start this month first to add transactions</td>';
-    updateBalanceDisplay();
-    
-    // Hide entire transaction component (form and balance display)
-    const financeContainer = document.getElementById("financeContainer");
-    if (financeContainer) {
-      financeContainer.style.display = "none";
-    }
+    showMonthNotStartedMessage();
   }
 }
 
+/**
+ * Show message that month hasn't been started yet
+ */
+function showMonthNotStartedMessage() {
+  showTableNoData("transactionTableBody", 7, "Please start this month first to add transactions");
+  setElementVisibility("financeContainer", false);
+}
+
+/**
+ * Start/activate a month for the current plan
+ */
 function startMonth() {
-  const selectedMonth = document.getElementById("ddlMonths").value;
+  const selectedMonth = getDropdownValue("ddlMonths");
   if (!selectedMonth) {
     alert("Please select a month first.");
     return;
@@ -228,107 +402,55 @@ function startMonth() {
   
   // If no plan is selected, create a new monthly plan first
   if (!planId) {
-    const planName = `${selectedMonth} ${new Date().getFullYear()} Monthly Plan`;
-    console.log("Creating new monthly plan:", planName);
-    
-    apiCreatePlan(planName, "monthly").then((response) => {
-      console.log("Plan created:", response);
-      // Reload plans to get the new plan ID
-      loadPlans().then(() => {
-        // Find the newly created plan and select it
-        apiGetAllPlans().then((plans) => {
-          const newPlan = plans.find(p => p.name === planName);
-          if (newPlan) {
-            planId = newPlan.id;
-            currentPlanId = planId;
-            
-            // Select the new plan in the dropdown
-            document.getElementById("ddlPlans").value = planId;
-            
-            // Now activate the month
-            activateMonthForPlan(planId, selectedMonth);
-          } else {
-            alert("Error: Could not find newly created plan");
-          }
-        }).catch((error) => {
-          console.error("Error getting plans:", error);
-          alert("Error getting plans");
-        });
-      });
-    }).catch((error) => {
-      console.error("Error creating plan:", error);
-      alert("Error creating monthly plan");
-    });
+    createNewMonthlyPlanAndStart(selectedMonth);
   } else {
-    // Plan already exists, just activate the month
     activateMonthForPlan(planId, selectedMonth);
   }
 }
 
+/**
+ * Create a new monthly plan and activate the selected month
+ * @param {string} selectedMonth - The month to activate
+ */
+function createNewMonthlyPlanAndStart(selectedMonth) {
+  const planName = `${selectedMonth} ${new Date().getFullYear()} Monthly Plan`;
+  console.log("Creating new monthly plan:", planName);
+  
+  apiCreatePlan(planName, PLAN_TYPES.MONTHLY).then((response) => {
+    console.log("Plan created:", response);
+    loadPlans().then(() => {
+      apiGetAllPlans().then((plans) => {
+        const newPlan = plans.find(p => p.name === planName);
+        if (newPlan) {
+          currentPlanId = newPlan.id;
+          setDropdownValue("ddlPlans", newPlan.id);
+          activateMonthForPlan(newPlan.id, selectedMonth);
+        } else {
+          alert("Error: Could not find newly created plan");
+        }
+      }).catch((error) => {
+        console.error("Error getting plans:", error);
+        alert("Error getting plans");
+      });
+    });
+  }).catch((error) => {
+    console.error("Error creating plan:", error);
+    alert("Error creating monthly plan");
+  });
+}
+
+/**
+ * Activate a month for a specific plan
+ * @param {number} planId - The plan ID
+ * @param {string} selectedMonth - The month to activate
+ */
 function activateMonthForPlan(planId, selectedMonth) {
   console.log("Activating month:", selectedMonth, "for plan:", planId);
   
-  // Activate month and create the financial plan
   apiActivateMonth(planId, selectedMonth).then((result) => {
     console.log("Month activation result:", result);
     if (result.success) {
-      // Show finance container and enable controls
-      document.getElementById("financeContainer").style.display = "block";
-      document.getElementById("btnDeletePlan").disabled = false;
-      
-      // Update just the selected month option to green, don't recreate entire dropdown
-      const selectedOption = document.getElementById("ddlMonths").querySelector(`option[value="${selectedMonth}"]`);
-      if (selectedOption) {
-        selectedOption.textContent = `🟢 ${selectedMonth}`;
-        selectedOption.style.backgroundColor = "#90EE90";
-        selectedOption.style.color = "black";
-        // Make sure this option is selected
-        document.getElementById("ddlMonths").value = selectedMonth;
-      }
-      
-      // Load transactions for the newly activated month
-      loadTransactions();
-      
-      // Check if previous month has transactions before asking to copy
-      if (result.previous_month) {
-        // First check if previous month has an active plan
-        apiGetMonthlyPlanMonths(planId).then((months) => {
-          const previousMonthData = months ? months.find(m => m.month === result.previous_month) : null;
-          const isPreviousMonthActive = previousMonthData && previousMonthData.is_active;
-          
-          console.log("Previous month:", result.previous_month, "Is active:", isPreviousMonthActive);
-          
-          // Only check for transactions if previous month is active
-          if (isPreviousMonthActive) {
-            // Check if previous month has any transactions (income or payments)
-            Promise.all([
-              apiGetIncomes(planId, result.previous_month),
-              apiGetPayments(planId, result.previous_month)
-            ]).then(([incomes, payments]) => {
-              const hasTransactions = (incomes && incomes.length > 0) || (payments && payments.length > 0);
-              
-              console.log("Previous month has transactions:", hasTransactions);
-              
-              if (hasTransactions) {
-                if (confirm("Do you want to copy regular transactions from previous month?")) {
-                  apiCopyRegularTransactions(planId, result.previous_month, selectedMonth).then(() => {
-                    loadTransactions();
-                  }).catch((error) => {
-                    console.error("Error copying transactions:", error);
-                    alert("Error copying transactions");
-                  });
-                }
-              }
-            }).catch((error) => {
-              console.error("Error checking previous month transactions:", error);
-            });
-          } else {
-            console.log("Previous month is not active, skipping copy prompt");
-          }
-        }).catch((error) => {
-          console.error("Error checking previous month status:", error);
-        });
-      }
+      handleSuccessfulMonthActivation(selectedMonth, result);
     } else {
       alert("Error starting month");
     }
@@ -338,112 +460,104 @@ function activateMonthForPlan(planId, selectedMonth) {
   });
 }
 
-function generateMonthOptions() {
-  const months = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December"
-  ];
+/**
+ * Handle successful month activation
+ * @param {string} selectedMonth - The activated month
+ * @param {object} result - The activation result from API
+ */
+function handleSuccessfulMonthActivation(selectedMonth, result) {
+  // Show finance container and enable delete button
+  setElementVisibility("financeContainer", "block");
+  setButtonState("btnDeletePlan", true);
   
-  const ddlMonths = document.getElementById("ddlMonths");
-  ddlMonths.innerHTML = '<option value="">-- Select Month --</option>';
+  // Update the month option display to green
+  const option = findDropdownOption("ddlMonths", selectedMonth);
+  if (option) {
+    updateDropdownOptionDisplay(option, ICONS.ACTIVE, true);
+    setDropdownValue("ddlMonths", selectedMonth);
+  }
   
-  months.forEach(month => {
-    const option = document.createElement("option");
-    option.value = month;
-    option.textContent = month;
-    ddlMonths.appendChild(option);
+  // Load transactions for the newly activated month
+  loadTransactions();
+  
+  // Ask about copying transactions from previous month
+  if (result.previous_month) {
+    askAboutCopyingPreviousMonthTransactions(planId, result.previous_month, selectedMonth);
+  }
+}
+
+/**
+ * Check previous month and ask if user wants to copy transactions
+ * @param {number} planId - The plan ID
+ * @param {string} previousMonth - The previous month
+ * @param {string} selectedMonth - The current month
+ */
+function askAboutCopyingPreviousMonthTransactions(planId, previousMonth, selectedMonth) {
+  apiGetMonthlyPlanMonths(currentPlanId).then((months) => {
+    const previousMonthData = months ? months.find(m => m.month === previousMonth) : null;
+    const isPreviousMonthActive = previousMonthData && previousMonthData.is_active;
+    
+    console.log("Previous month:", previousMonth, "Is active:", isPreviousMonthActive);
+    
+    if (isPreviousMonthActive) {
+      checkPreviousMonthTransactionsAndCopy(planId, previousMonth, selectedMonth);
+    }
+  }).catch((error) => {
+    console.error("Error checking previous month status:", error);
   });
 }
 
+/**
+ * Check if previous month has transactions and ask to copy them
+ * @param {number} planId - The plan ID
+ * @param {string} previousMonth - The previous month
+ * @param {string} selectedMonth - The current month
+ */
+function checkPreviousMonthTransactionsAndCopy(planId, previousMonth, selectedMonth) {
+  Promise.all([
+    apiGetIncomes(planId, previousMonth),
+    apiGetPayments(planId, previousMonth)
+  ]).then(([incomes, payments]) => {
+    const hasTransactions = (incomes && incomes.length > 0) || (payments && payments.length > 0);
+    
+    console.log("Previous month has transactions:", hasTransactions);
+    
+    if (hasTransactions && confirm("Do you want to copy regular transactions from previous month?")) {
+      apiCopyRegularTransactions(planId, previousMonth, selectedMonth).then(() => {
+        loadTransactions();
+      }).catch((error) => {
+        console.error("Error copying transactions:", error);
+        alert("Error copying transactions");
+      });
+    }
+  }).catch((error) => {
+    console.error("Error checking previous month transactions:", error);
+  });
+}
+
+/**
+ * Load and display monthly plan months with their active status
+ */
 function loadMonthlyMonths() {
   console.log("=== loadMonthlyMonths START ===");
-  console.log("currentPlanId:", currentPlanId, "currentPlanType:", currentPlanType);
   
-  if (currentPlanType !== "monthly") {
+  if (currentPlanType !== PLAN_TYPES.MONTHLY) {
     console.log("Returning early - not monthly plan");
     return;
   }
   
-  console.log("Generating month options...");
-  generateMonthOptions(); // Generate month options first
-  
-  const ddlMonths = document.getElementById("ddlMonths");
-  console.log("ddlMonths element:", ddlMonths);
-  console.log("ddlMonths options count:", ddlMonths ? ddlMonths.options.length : "not found");
+  // Generate month options first
+  populateMonthDropdown();
   
   if (!currentPlanId) {
-    console.log("No plan selected - showing all months with red icons");
-    // If no plan selected, show all months with red icons
-    const allOptions = ddlMonths.querySelectorAll("option[value]");
-    console.log("Found options to update:", allOptions.length);
-    allOptions.forEach((option, index) => {
-      console.log(`Updating option ${index}:`, option.value, "->", `🔴 ${option.value}`);
-      if (option.value) {
-        option.textContent = `🔴 ${option.value}`;
-        option.style.backgroundColor = "#D3D3D3";
-        option.style.color = "gray";
-      }
-    });
-    console.log("=== loadMonthlyMonths END (no plan) ===");
+    setAllMonthsToInactive();
     return;
   }
   
   console.log("Calling API with planId:", currentPlanId);
   apiGetMonthlyPlanMonths(currentPlanId).then((months) => {
     console.log("API returned months:", months);
-    
-    // First, set all months to red by default and clear data attributes
-    const allOptions = ddlMonths.querySelectorAll("option[value]");
-    allOptions.forEach((option) => {
-      if (option.value) {
-        option.textContent = `🔴 ${option.value}`;
-        option.style.backgroundColor = "#D3D3D3";
-        option.style.color = "gray";
-        option.removeAttribute('data-plan-id');
-        option.removeAttribute('data-is-active');
-      }
-    });
-    
-    // Then update months that exist in database
-    if (months && months.length > 0) {
-      console.log("Processing months data...");
-      console.log("Available options in dropdown:");
-      ddlMonths.querySelectorAll("option[value]").forEach(opt => {
-        console.log("  Option:", opt.value, opt.textContent);
-      });
-      
-      months.forEach((monthData) => {
-        console.log("Processing month:", monthData.month, "is_active:", monthData.is_active);
-        const option = ddlMonths.querySelector(`option[value="${monthData.month}"]`);
-        console.log("Found option for", monthData.month, ":", option);
-        if (option) {
-          // Add data attributes for plan tracking
-          option.setAttribute('data-plan-id', currentPlanId);
-          option.setAttribute('data-is-active', monthData.is_active);
-          console.log("Set data attributes for", monthData.month, "- plan-id:", currentPlanId, "is-active:", monthData.is_active);
-          
-          // Add icon based on whether month has a plan (exists in monthly_plan_months table)
-          const icon = monthData.is_active ? "🟢" : "🔴";
-          const newText = `${icon} ${monthData.month}`;
-          console.log("Updating option text from:", option.textContent, "to:", newText);
-          option.textContent = newText;
-          
-          if (monthData.is_active) {
-            option.style.backgroundColor = "#90EE90";
-            option.style.color = "black";
-            console.log("Set month", monthData.month, "as active with green icon");
-          } else {
-            option.style.backgroundColor = "#D3D3D3";
-            option.style.color = "gray";
-            console.log("Set month", monthData.month, "as inactive with red icon");
-          }
-        } else {
-          console.log("Option not found for month:", monthData.month);
-        }
-      });
-    } else {
-      console.log("No months data available - keeping all months as red");
-    }
+    updateMonthlyPlansDisplay(months);
     console.log("=== loadMonthlyMonths END (with API data) ===");
   }).catch((error) => {
     console.error("Error loading months:", error);
@@ -451,66 +565,84 @@ function loadMonthlyMonths() {
   });
 }
 
-function updateTransactionTable(details) {
-  const tbody = document.getElementById("transactionTableBody");
-  tbody.innerHTML = "";
-  const symbol = currencySymbols[currentCurrency] || '$';
+/**
+ * Set all months to inactive display
+ */
+function setAllMonthsToInactive() {
+  console.log("Setting all months to inactive");
+  const options = getDropdownOptions("ddlMonths");
+  options.forEach((option) => {
+    if (option.value) {
+      updateDropdownOptionDisplay(option, ICONS.INACTIVE, false);
+      option.removeAttribute('data-plan-id');
+      option.removeAttribute('data-is-active');
+    }
+  });
+}
 
-  if (details && details.length > 0) {
-    details.forEach((transaction) => {
-      const row = tbody.insertRow();
-      const balanceClass = transaction.balance < 0 ? "negative-balance" : "positive-balance";
-      const amountClass = transaction.type === "income" ? "income-amount" : "payment-amount";
-      const amountDisplay = transaction.type === "income" ? `+${symbol}${transaction.amount.toFixed(2)}` : `-${symbol}${transaction.amount.toFixed(2)}`;
-      const typeDisplay = transaction.type === "income" ? "Income" : "Expense";
-      const subtypeDisplay = transaction.subtype ? transaction.subtype.charAt(0).toUpperCase() + transaction.subtype.slice(1) : "";
-      const formattedDate = formatDateToIsraeli(transaction.date);
-      
-      row.innerHTML = `
-        <td>${formattedDate}</td>
-        <td>${transaction.description}</td>
-        <td>${typeDisplay}</td>
-        <td>${subtypeDisplay}</td>
-        <td class="${amountClass}">${amountDisplay}</td>
-        <td class="${balanceClass}">${symbol}${transaction.balance.toFixed(2)}</td>
-        <td><button onclick="deleteTransaction(${transaction.id}, '${transaction.type}')">Delete</button></td>
-      `;
+/**
+ * Update the display of monthly plans based on their active status
+ * @param {Array} months - Array of month objects from API
+ */
+function updateMonthlyPlansDisplay(months) {
+  // First, set all months to inactive by default
+  const options = getDropdownOptions("ddlMonths");
+  options.forEach((option) => {
+    if (option.value) {
+      updateDropdownOptionDisplay(option, ICONS.INACTIVE, false);
+      option.removeAttribute('data-plan-id');
+      option.removeAttribute('data-is-active');
+    }
+  });
+  
+  // Then update months that exist in database
+  if (months && months.length > 0) {
+    months.forEach((monthData) => {
+      console.log("Processing month:", monthData.month, "is_active:", monthData.is_active);
+      const option = findDropdownOption("ddlMonths", monthData.month);
+      if (option) {
+        // Add data attributes for plan tracking
+        option.setAttribute('data-plan-id', currentPlanId);
+        option.setAttribute('data-is-active', monthData.is_active);
+        
+        // Update display
+        updateDropdownOptionDisplay(option, 
+          monthData.is_active ? ICONS.ACTIVE : ICONS.INACTIVE, 
+          monthData.is_active);
+      }
     });
   }
 }
 
+
+// ============================================================================
+// Plan Management
+// ============================================================================
+
+/**
+ * Load all plans and populate the plan dropdown
+ */
 function loadPlans() {
   if (!window.pywebview || !window.pywebview.api) {
     console.error("API not available yet");
-    return Promise.resolve();
+    return;
   }
 
-  return apiGetAllPlans().then((plans) => {
+  apiGetAllPlans().then((plans) => {
     console.log("Plans loaded:", plans);
-    const ddl = document.getElementById("ddlPlans");
-    ddl.innerHTML = '<option value="">-- Select a Plan --</option>';
     
-    if (plans && plans.length > 0) {
-      const planType = document.getElementById("ddlPlanType").value;
-      console.log("Current plan type:", planType);
-      
-      // Filter plans based on current mode
-      const filteredPlans = planType === "custom" 
-        ? plans.filter(plan => !plan.name.includes("Monthly Plan"))
-        : plans.filter(plan => plan.name.includes("Monthly Plan"));
-      
-      console.log("Filtered plans:", filteredPlans);
-      
-      filteredPlans.forEach((plan) => {
-        const option = document.createElement("option");
-        option.value = plan.id;
-        option.text = plan.name;
-        ddl.appendChild(option);
-      });
-    } else {
-      console.log("No plans found in database");
-    }
-    return plans; // Return plans for chaining
+    const planType = getDropdownValue("ddlPlanType");
+    console.log("Current plan type:", planType);
+    
+    // Filter plans based on current mode
+    const filteredPlans = planType === PLAN_TYPES.CUSTOM 
+      ? plans.filter(plan => !plan.name.includes("Monthly Plan"))
+      : plans.filter(plan => plan.name.includes("Monthly Plan"));
+    
+    console.log("Filtered plans:", filteredPlans);
+    populatePlansDropdown(filteredPlans);
+    
+    return plans;
   }).catch((error) => {
     console.error("Error loading plans:", error);
     alert("Error loading plans: " + error);
@@ -518,72 +650,105 @@ function loadPlans() {
   });
 }
 
-function selectPlan() {
+/**
+ * Populate the plans dropdown with available plans
+ * @param {Array} plans - Array of plan objects
+ */
+function populatePlansDropdown(plans) {
   const ddl = document.getElementById("ddlPlans");
-  currentPlanId = parseInt(ddl.value) || null;
+  ddl.innerHTML = '<option value="">-- Select a Plan --</option>';
   
-  if (currentPlanId) {
-    document.getElementById("financeContainer").style.display = "block";
-    document.getElementById("btnDeletePlan").disabled = false;
-    
-    // Get plan details to determine if it's monthly
-    // Note: We'll need to add a method to get plan type
-    // For now, assume it's custom if no month data exists
-    apiGetMonthlyPlanMonths(currentPlanId).then((months) => {
-      if (months && months.length > 0) {
-        currentPlanType = "monthly";
-        document.getElementById("ddlPlanType").value = "monthly";
-        onPlanTypeChange();
-        generateMonthOptions(); // Generate month options first
-        loadMonthlyMonths();
-      } else {
-        currentPlanType = "custom";
-        document.getElementById("ddlPlanType").value = "custom";
-        onPlanTypeChange();
-      }
-      
-      // Load the saved initial balance for this plan
-      apiGetPlanInitialBalance(currentPlanId).then((balance) => {
-        document.getElementById("txtInitialBalance").value = balance;
-        updateBalanceDisplay();
-      }).catch((error) => {
-        console.error("Error loading initial balance:", error);
-      });
-
-      // Load the saved currency for this plan
-      apiGetPlanCurrency(currentPlanId).then((currency) => {
-        currentCurrency = currency;
-        document.getElementById("ddlCurrency").value = currency;
-      }).catch((error) => {
-        console.error("Error loading currency:", error);
-      });
-      
-      loadTransactions();
-    }).catch((error) => {
-      console.error("Error checking plan type:", error);
+  if (plans && plans.length > 0) {
+    plans.forEach((plan) => {
+      const option = document.createElement("option");
+      option.value = plan.id;
+      option.text = plan.name;
+      ddl.appendChild(option);
     });
   } else {
-    document.getElementById("financeContainer").style.display = "none";
-    document.getElementById("btnDeletePlan").disabled = true;
-    document.getElementById("txtInitialBalance").value = "";
-    currentCurrency = 'USD';
-    document.getElementById("ddlCurrency").value = 'USD';
-    currentPlanType = 'custom';
-    document.getElementById("ddlPlanType").value = 'custom';
-    onPlanTypeChange();
+    console.log("No plans found in database");
   }
 }
 
+/**
+ * Handle plan selection
+ */
+function selectPlan() {
+  currentPlanId = parseInt(getDropdownValue("ddlPlans")) || null;
+  
+  if (currentPlanId) {
+    loadSelectedPlanDetails();
+  } else {
+    clearPlanSelection();
+  }
+}
+
+/**
+ * Load currency and balance for selected plan
+ */
+function loadSelectedPlanDetails() {
+  setElementVisibility("financeContainer", true);
+  setButtonState("btnDeletePlan", true);
+  
+  // Load plan details
+  Promise.all([
+    apiGetPlanCurrency(currentPlanId),
+    apiGetPlanInitialBalance(currentPlanId)
+  ]).then(([currency, initialBalance]) => {
+    currentCurrency = currency;
+    setDropdownValue("ddlCurrency", currency);
+    setInputValue("txtInitialBalance", initialBalance);
+    
+    // Determine plan type (monthly or custom) based on existing months
+    return apiGetMonthlyPlanMonths(currentPlanId);
+  }).then((months) => {
+    if (months && months.length > 0) {
+      currentPlanType = PLAN_TYPES.MONTHLY;
+      setDropdownValue("ddlPlanType", PLAN_TYPES.MONTHLY);
+      onPlanTypeChange();
+    } else {
+      currentPlanType = PLAN_TYPES.CUSTOM;
+      setDropdownValue("ddlPlanType", PLAN_TYPES.CUSTOM);
+      onPlanTypeChange();
+    }
+    
+    // Finally load transactions
+    loadTransactions();
+  }).catch((error) => {
+    console.error("Error loading plan details:", error);
+  });
+}
+
+/**
+ * Clear plan selection and reset UI
+ */
+function clearPlanSelection() {
+  setElementVisibility("financeContainer", false);
+  setButtonState("btnDeletePlan", false);
+  setInputValue("txtInitialBalance", "");
+  currentCurrency = 'USD';
+  setDropdownValue("ddlCurrency", 'USD');
+  currentPlanType = PLAN_TYPES.CUSTOM;
+  setDropdownValue("ddlPlanType", PLAN_TYPES.CUSTOM);
+  onPlanTypeChange();
+}
+
+/**
+ * Create a new plan
+ */
 function createPlan() {
-  const planName = document.getElementById("txtNewPlanName").value.trim();
-  const planType = document.getElementById("ddlPlanType").value;
+  const planName = getInputValue("txtNewPlanName").trim();
+  const planType = getDropdownValue("ddlPlanType");
+  const initialBalance = parseFloat(getInputValue("txtInitialBalance")) || 0;
+  const currency = getDropdownValue("ddlCurrency") || 'USD';
+  
   if (!planName) {
     alert("Please enter a plan name.");
     return;
   }
 
-  apiCreatePlan(planName, planType).then((response) => {
-    document.getElementById("txtNewPlanName").value = "";
+  apiCreatePlan(planName, planType, initialBalance, currency).then((response) => {
+    clearInput("txtNewPlanName");
     loadPlans();
   }).catch((error) => {
     console.error("Error creating plan:", error);
@@ -591,15 +756,18 @@ function createPlan() {
   });
 }
 
+/**
+ * Delete the current plan
+ */
 function deletePlan() {
   if (!currentPlanId) return;
   
   if (confirm("Are you sure you want to delete this plan? This action cannot be undone.")) {
     apiDeletePlan(currentPlanId).then((response) => {
       currentPlanId = null;
-      document.getElementById("ddlPlans").value = "";
+      setDropdownValue("ddlPlans", "");
+      clearPlanSelection();
       loadPlans();
-      selectPlan();
     }).catch((error) => {
       console.error("Error deleting plan:", error);
       alert("Error deleting plan");
@@ -607,175 +775,45 @@ function deletePlan() {
   }
 }
 
+/**
+ * Save plan currency
+ */
 function saveCurrency() {
   if (!currentPlanId) {
     alert("Please select a plan first.");
     return;
   }
 
-  const currency = document.getElementById("ddlCurrency").value;
+  const currency = getDropdownValue("ddlCurrency");
   currentCurrency = currency;
 
   apiSetPlanCurrency(currentPlanId, currency).then((response) => {
-    // Currency saved successfully, no popup needed
+    // Currency saved successfully
+    updateBalanceDisplay();
   }).catch((error) => {
     console.error("Error saving currency:", error);
     alert("Error saving currency");
   });
 }
 
-function loadTransactions(isMonthActive = null) {
-  if (!currentPlanId) return;
-  
-  const initialBalance = parseFloat(document.getElementById("txtInitialBalance").value) || 0;
-  
-  if (currentPlanType === "monthly") {
-    // For monthly plans, load transactions for the selected month
-    const selectedMonth = document.getElementById("ddlMonths").value;
-    
-    // Use the provided isMonthActive parameter, or get it from data attributes if not provided
-    let monthIsActive = isMonthActive;
-    if (monthIsActive === null) {
-      // Get the active status from the selected option's data attribute
-      const selectedOption = document.getElementById("ddlMonths").selectedOptions[0];
-      if (selectedOption) {
-        monthIsActive = selectedOption.getAttribute('data-is-active') === 'true';
-      }
-    }
-    
-    console.log("loadTransactions called with monthActive:", monthIsActive);
-    
-    // Show/hide transaction form based on whether month is active
-    const transactionForm = document.querySelector("div[style*='Add Transaction']");
-    if (transactionForm) {
-      transactionForm.style.display = monthIsActive ? "block" : "none";
-    }
-    
-    if (monthIsActive) {
-      console.log("About to call apiGetCashFlowDetails with:", currentPlanId, initialBalance, selectedMonth);
-      // Ensure finance container is visible
-      document.getElementById("financeContainer").style.display = "block";
-      // Load transactions only if month is active
-      apiGetCashFlowDetails(currentPlanId, initialBalance, selectedMonth).then((details) => {
-        console.log("Transactions loaded:", details);
-        updateTransactionTable(details);
-        updateBalanceDisplay();
-      }).catch((error) => {
-        console.error("Error loading monthly transactions:", error);
-      });
-    } else {
-      // Clear transaction table and show message
-      document.getElementById("transactionTableBody").innerHTML = '<td colspan="7" style="text-align: center;">Please start this month first to add transactions</td>';
-      updateBalanceDisplay();
-    }
-  } else {
-    // For custom plans, load all transactions
-    apiGetCashFlowDetails(currentPlanId, initialBalance).then((details) => {
-      updateTransactionTable(details);
-      updateBalanceDisplay();
-    }).catch((error) => {
-      console.error("Error loading transactions:", error);
-    });
-  }
-}
-
-function addTransaction() {
-  if (!currentPlanId) {
-    alert("Please select a plan first.");
-    return;
-  }
-  
-  if (currentPlanType === "monthly") {
-    const selectedMonth = document.getElementById("ddlMonths").value;
-    if (!selectedMonth) {
-      alert("Please select a month first.");
-      return;
-    }
-    
-    // Check if month is active before allowing transaction addition
-    apiGetMonthlyPlanMonths(currentPlanId).then((months) => {
-      const monthData = months ? months.find(m => m.month === selectedMonth) : null;
-      const isMonthActive = monthData && monthData.is_active;
-      
-      if (!isMonthActive) {
-        alert("Please start this month first before adding transactions.");
-        return;
-      }
-      
-      // Proceed with transaction addition
-      proceedWithTransactionAddition(selectedMonth);
-    }).catch((error) => {
-      console.error("Error checking month status:", error);
-    });
-  } else {
-    // For custom plans, proceed directly
-    proceedWithTransactionAddition(null);
-  }
-}
-
-function proceedWithTransactionAddition(month) {
-  const type = document.getElementById("ddlTransactionType").value;
-  const description = document.getElementById("txtTransactionDescription").value.trim();
-  const date = document.getElementById("txtTransactionDate").value;
-  const amount = parseFloat(document.getElementById("txtTransactionAmount").value);
-
-  if (!description || !date || isNaN(amount) || amount <= 0) {
-    alert("Please enter a valid description, date, and amount.");
-    return;
-  }
-
-  // Get subtype for monthly plans
-  const subtype = currentPlanType === "monthly" ? document.getElementById("ddlTransactionSubtype").value : 'regular';
-  const monthParam = currentPlanType === "monthly" ? month : null;
-
-  // HTML date input already returns ISO format (yyyy-mm-dd), so use it directly
-  let apiCall;
-  if (type === "income") {
-    apiCall = apiAddIncome(currentPlanId, description, amount, date, subtype, monthParam);
-  } else {
-    apiCall = apiAddPayment(currentPlanId, description, amount, date, subtype, monthParam);
-  }
-
-  apiCall.then((response) => {
-    // Clear form
-    document.getElementById("txtTransactionDescription").value = "";
-    document.getElementById("txtTransactionDate").value = "";
-    document.getElementById("txtTransactionAmount").value = "";
-    loadTransactions();
-  }).catch((error) => {
-    console.error(`Error adding ${type}:`, error);
-    alert(`Error adding ${type}`);
-  });
-}
-
-function deleteTransaction(transactionId, type) {
-  if (confirm(`Delete this ${type === 'income' ? 'income' : 'expense'} entry?`)) {
-    let apiCall;
-    if (type === "income") {
-      apiCall = apiDeleteIncome(transactionId);
-    } else {
-      apiCall = apiDeletePayment(transactionId);
-    }
-    
-    apiCall.then((response) => {
-      loadTransactions();
-    }).catch((error) => {
-      console.error(`Error deleting ${type}:`, error);
-      alert(`Error deleting ${type}`);
-    });
-  }
-}
-
+/**
+ * Save initial balance for plan
+ */
 function saveInitialBalance() {
   if (!currentPlanId) {
     alert("Please select a plan first.");
     return;
   }
 
-  const initialBalance = parseFloat(document.getElementById("txtInitialBalance").value);
+  const initialBalance = parseFloat(getInputValue("txtInitialBalance"));
 
   if (isNaN(initialBalance)) {
     alert("Please enter a valid initial balance.");
+    return;
+  }
+
+  if (initialBalance < 0) {
+    alert("Initial balance cannot be negative.");
     return;
   }
 
@@ -788,13 +826,200 @@ function saveInitialBalance() {
 }
 
 
+
+// ============================================================================
+// Transaction Management
+// ============================================================================
+
+/**
+ * Load transactions for the current plan
+ * @param {boolean} isMonthActive - Whether the current month is active (for monthly plans)
+ */
+function loadTransactions(isMonthActive = null) {
+  if (!currentPlanId) return;
+  
+  const initialBalance = parseFloat(getInputValue("txtInitialBalance")) || 0;
+  
+  if (currentPlanType === PLAN_TYPES.MONTHLY) {
+    loadMonthlyTransactions(initialBalance, isMonthActive);
+  } else {
+    loadCustomTransactions(initialBalance);
+  }
+}
+
+/**
+ * Load transactions for a monthly plan
+ * @param {number} initialBalance - The initial balance
+ * @param {boolean} isMonthActive - Whether the month is active
+ */
+function loadMonthlyTransactions(initialBalance, isMonthActive) {
+  const selectedMonth = getDropdownValue("ddlMonths");
+  
+  // Determine if month is active
+  let monthIsActive = isMonthActive;
+  if (monthIsActive === null) {
+    const activeAttr = getSelectedOptionDataAttribute("ddlMonths", "is-active");
+    monthIsActive = activeAttr === 'true';
+  }
+  
+  console.log("Loading monthly transactions - Month active:", monthIsActive);
+  
+  // Show/hide transaction form based on active status
+  const transactionForm = document.querySelector("div[style*='Add Transaction']");
+  if (transactionForm) {
+    transactionForm.style.display = monthIsActive ? "block" : "none";
+  }
+  
+  if (monthIsActive) {
+    setElementVisibility("financeContainer", true);
+    apiGetCashFlowDetails(currentPlanId, initialBalance, selectedMonth).then((details) => {
+      console.log("Monthly transactions loaded:", details);
+      updateTransactionTable(details);
+      updateBalanceDisplay();
+    }).catch((error) => {
+      console.error("Error loading monthly transactions:", error);
+    });
+  } else {
+    showTableNoData("transactionTableBody", 7, "Please start this month first to add transactions");
+    updateBalanceDisplay();
+  }
+}
+
+/**
+ * Load transactions for a custom plan
+ * @param {number} initialBalance - The initial balance
+ */
+function loadCustomTransactions(initialBalance) {
+  apiGetCashFlowDetails(currentPlanId, initialBalance).then((details) => {
+    updateTransactionTable(details);
+    updateBalanceDisplay();
+  }).catch((error) => {
+    console.error("Error loading transactions:", error);
+  });
+}
+
+/**
+ * Add a new transaction (income or expense)
+ */
+function addTransaction() {
+  if (!currentPlanId) {
+    alert("Please select a plan first.");
+    return;
+  }
+  
+  if (currentPlanType === PLAN_TYPES.MONTHLY) {
+    const selectedMonth = getDropdownValue("ddlMonths");
+    if (!selectedMonth) {
+      alert("Please select a month first.");
+      return;
+    }
+    
+    checkMonthActiveAndAddTransaction(selectedMonth);
+  } else {
+    proceedWithTransactionAddition(null);
+  }
+}
+
+/**
+ * Check if month is active before allowing transaction addition
+ * @param {string} selectedMonth - The selected month
+ */
+function checkMonthActiveAndAddTransaction(selectedMonth) {
+  apiGetMonthlyPlanMonths(currentPlanId).then((months) => {
+    const monthData = months ? months.find(m => m.month === selectedMonth) : null;
+    const isMonthActive = monthData && monthData.is_active;
+    
+    if (!isMonthActive) {
+      alert("Please start this month first before adding transactions.");
+      return;
+    }
+    
+    proceedWithTransactionAddition(selectedMonth);
+  }).catch((error) => {
+    console.error("Error checking month status:", error);
+  });
+}
+
+/**
+ * Proceed with adding a transaction
+ * @param {string} month - The month (null for custom plans)
+ */
+function proceedWithTransactionAddition(month) {
+  const type = getDropdownValue("ddlTransactionType");
+  const description = getInputValue("txtTransactionDescription").trim();
+  const date = getInputValue("txtTransactionDate");
+  const amount = parseFloat(getInputValue("txtTransactionAmount"));
+
+  if (!description || !date || isNaN(amount) || amount <= 0) {
+    alert("Please enter a valid description, date, and amount.");
+    return;
+  }
+
+  // Get subtype for monthly plans
+  const subtype = currentPlanType === PLAN_TYPES.MONTHLY 
+    ? getDropdownValue("ddlTransactionSubtype") 
+    : TRANSACTION_SUBTYPES.REGULAR;
+
+  // Add transaction via API
+  const apiCall = type === TRANSACTION_TYPES.INCOME
+    ? apiAddIncome(currentPlanId, description, amount, date, subtype, month)
+    : apiAddPayment(currentPlanId, description, amount, date, subtype, month);
+
+  apiCall.then((response) => {
+    clearTransactionForm();
+    loadTransactions();
+  }).catch((error) => {
+    console.error(`Error adding ${type}:`, error);
+    alert(`Error adding ${type}`);
+  });
+}
+
+/**
+ * Clear the transaction input form
+ */
+function clearTransactionForm() {
+  clearInput("txtTransactionDescription");
+  clearInput("txtTransactionDate");
+  clearInput("txtTransactionAmount");
+}
+
+/**
+ * Delete a transaction
+ * @param {number} transactionId - The transaction ID
+ * @param {string} type - The transaction type (income or payment)
+ */
+function deleteTransaction(transactionId, type) {
+  const typeLabel = type === TRANSACTION_TYPES.INCOME ? 'income' : 'expense';
+  if (confirm(`Delete this ${typeLabel} entry?`)) {
+    const apiCall = type === TRANSACTION_TYPES.INCOME
+      ? apiDeleteIncome(transactionId)
+      : apiDeletePayment(transactionId);
+    
+    apiCall.then((response) => {
+      loadTransactions();
+    }).catch((error) => {
+      console.error(`Error deleting ${type}:`, error);
+      alert(`Error deleting ${type}`);
+    });
+  }
+}
+
+
+
+// ============================================================================
+// Export and Reporting
+// ============================================================================
+
+/**
+ * Export cash flow details to an Excel file
+ */
 function exportCashFlow() {
   if (!currentPlanId) {
     alert("Please select a plan first.");
     return;
   }
 
-  const initialBalance = parseFloat(document.getElementById("txtInitialBalance").value);
+  const initialBalance = parseFloat(getInputValue("txtInitialBalance"));
 
   if (isNaN(initialBalance)) {
     alert("Please enter a valid initial balance.");
@@ -804,29 +1029,7 @@ function exportCashFlow() {
   try {
     // Load XLSX library first, then proceed with export
     loadXLSXLibrary().then(() => {
-      apiGetCashFlowDetails(currentPlanId, initialBalance).then((details) => {
-        if (!details || details.length === 0) {
-          alert("No cash flow data to export. Please add some transactions first.");
-          return;
-        }
-        
-        const planName = document.getElementById("ddlPlans").selectedOptions[0].text;
-        const symbol = currencySymbols[currentCurrency] || '$';
-        
-        try {
-          const result = exportCashFlowToExcel(planName, currentCurrency, symbol, details, initialBalance);
-          
-          if (result && result.workbook) {
-            triggerFileDownload(result.workbook, result.defaultFileName);
-          }
-        } catch (error) {
-          console.error("Error exporting:", error);
-          alert("Error exporting: " + error.message);
-        }
-      }).catch((error) => {
-        console.error("Error getting cash flow details:", error);
-        alert("Error getting cash flow details: " + error);
-      });
+      performCashFlowExport(initialBalance);
     }).catch((error) => {
       console.error("Error loading XLSX library:", error);
       alert("Error loading XLSX library: " + error);
@@ -835,4 +1038,34 @@ function exportCashFlow() {
     console.error("Export error:", error);
     alert("Error during export: " + error.message);
   }
+}
+
+/**
+ * Perform the actual cash flow export
+ * @param {number} initialBalance - The initial balance
+ */
+function performCashFlowExport(initialBalance) {
+  apiGetCashFlowDetails(currentPlanId, initialBalance).then((details) => {
+    if (!details || details.length === 0) {
+      alert("No cash flow data to export. Please add some transactions first.");
+      return;
+    }
+    
+    const planName = getDropdownSelectedText("ddlPlans");
+    const symbol = CURRENCY_SYMBOLS[currentCurrency] || '$';
+    
+    try {
+      const result = exportCashFlowToExcel(planName, currentCurrency, symbol, details, initialBalance);
+      
+      if (result && result.workbook) {
+        triggerFileDownload(result.workbook, result.defaultFileName);
+      }
+    } catch (error) {
+      console.error("Error exporting:", error);
+      alert("Error exporting: " + error.message);
+    }
+  }).catch((error) => {
+    console.error("Error getting cash flow details:", error);
+    alert("Error getting cash flow details: " + error);
+  });
 }

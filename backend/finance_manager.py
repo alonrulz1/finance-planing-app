@@ -94,29 +94,15 @@ class FinanceManager:
         conn.commit()
         conn.close()
 
-    def create_plan(self, name, plan_type='custom'):
+    def create_plan(self, name, plan_type='custom', initial_balance=0, currency='USD'):
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        cursor.execute("INSERT INTO financial_plans (name, plan_type, initial_balance) VALUES (?, ?, ?)", (name, plan_type, 0))
+        cursor.execute("INSERT INTO financial_plans (name, plan_type, initial_balance, currency) VALUES (?, ?, ?, ?)", (name, plan_type, initial_balance, currency))
         conn.commit()
         conn.close()
         return {"status": "success", "message": "Plan created successfully."}
 
-    def add_income(self, plan_id, description, amount, date):
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        cursor.execute("INSERT INTO incomes (plan_id, description, amount, date) VALUES (?, ?, ?, ?)", (plan_id, description, amount, date))
-        conn.commit()
-        conn.close()
-        return {"status": "success", "message": "Income added successfully."}
 
-    def add_payment(self, plan_id, description, amount, date):
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        cursor.execute("INSERT INTO payments (plan_id, description, amount, date) VALUES (?, ?, ?, ?)", (plan_id, description, amount, date))
-        conn.commit()
-        conn.close()
-        return {"status": "success", "message": "Payment added successfully."}
 
     def get_all_plans(self):
         conn = sqlite3.connect(self.db_path)
@@ -163,32 +149,33 @@ class FinanceManager:
         cursor = conn.cursor()
         
         if month:
-            cursor.execute("SELECT id, description, amount, date FROM incomes WHERE plan_id = ? AND month = ? ORDER BY date ASC", (plan_id, month))
+            cursor.execute("SELECT id, description, amount, date, subtype FROM incomes WHERE plan_id = ? AND month = ? ORDER BY date ASC", (plan_id, month))
         else:
-            cursor.execute("SELECT id, description, amount, date FROM incomes WHERE plan_id = ? ORDER BY date ASC", (plan_id,))
+            cursor.execute("SELECT id, description, amount, date, subtype FROM incomes WHERE plan_id = ? ORDER BY date ASC", (plan_id,))
             
         incomes = cursor.fetchall()
         conn.close()
-        return [{"id": inc[0], "description": inc[1], "amount": inc[2], "date": inc[3]} for inc in incomes]
+        return [{"id": inc[0], "description": inc[1], "amount": inc[2], "date": inc[3], "subtype": inc[4]} for inc in incomes]
 
     def get_payments(self, plan_id, month=None):
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
         if month:
-            cursor.execute("SELECT id, description, amount, date FROM payments WHERE plan_id = ? AND month = ? ORDER BY date ASC", (plan_id, month))
+            cursor.execute("SELECT id, description, amount, date, subtype FROM payments WHERE plan_id = ? AND month = ? ORDER BY date ASC", (plan_id, month))
         else:
-            cursor.execute("SELECT id, description, amount, date FROM payments WHERE plan_id = ? ORDER BY date ASC", (plan_id,))
+            cursor.execute("SELECT id, description, amount, date, subtype FROM payments WHERE plan_id = ? ORDER BY date ASC", (plan_id,))
             
         payments = cursor.fetchall()
         conn.close()
-        return [{"id": pay[0], "description": pay[1], "amount": pay[2], "date": pay[3]} for pay in payments]
+        return [{"id": pay[0], "description": pay[1], "amount": pay[2], "date": pay[3], "subtype": pay[4]} for pay in payments]
 
     def delete_plan(self, plan_id):
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute("DELETE FROM incomes WHERE plan_id = ?", (plan_id,))
         cursor.execute("DELETE FROM payments WHERE plan_id = ?", (plan_id,))
+        cursor.execute("DELETE FROM monthly_plan_months WHERE plan_id = ?", (plan_id,))
         cursor.execute("DELETE FROM financial_plans WHERE id = ?", (plan_id,))
         conn.commit()
         conn.close()

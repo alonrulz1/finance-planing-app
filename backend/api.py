@@ -2,8 +2,8 @@ class Api:
     def __init__(self, finance_manager):
         self.finance_manager = finance_manager
 
-    def create_plan(self, name, plan_type='custom'):
-        return self.finance_manager.create_plan(name, plan_type)
+    def create_plan(self, name, plan_type='custom', initial_balance=0, currency='USD'):
+        return self.finance_manager.create_plan(name, plan_type, initial_balance, currency)
 
     def get_monthly_plan_months(self, plan_id):
         return self.finance_manager.get_monthly_plan_months(plan_id)
@@ -35,8 +35,8 @@ class Api:
     def add_payment(self, plan_id, description, amount, date, subtype='regular', month=None):
         return self.finance_manager.add_payment(plan_id, description, amount, date, subtype, month)
 
-    def get_incomes(self, plan_id):
-        return self.finance_manager.get_incomes(plan_id)
+    def get_incomes(self, plan_id, month=None):
+        return self.finance_manager.get_incomes(plan_id, month)
 
     def get_payments(self, plan_id, month=None):
         return self.finance_manager.get_payments(plan_id, month)

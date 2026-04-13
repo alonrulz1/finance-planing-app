@@ -6,6 +6,12 @@ from api import Api
 finance_manager = FinanceManager()
 api = Api(finance_manager)
 
+# Debug: Print available methods on API instance
+print("API methods available:")
+for attr in dir(api):
+    if not attr.startswith('_'):
+        print(f"  - {attr}")
+
 # Function to handle file serving for libs directory
 def serve_file(filename):
     """Serve files from the libs directory"""
@@ -28,20 +34,38 @@ html_file = os.path.join(frontend_dir, 'index.html')
 with open(html_file, 'r', encoding='utf-8') as f:
     html_content = f.read()
 
-js_file = os.path.join(frontend_dir, 'main.js')
-with open(js_file, 'r', encoding='utf-8') as f:
-    js_content_main = f.read()
+# Load all JS files in dependency order
+js_files = [
+    'dateUtil.js',
+    'apiUtil.js',
+    'uiManager.js',
+    'main.js'
+]
 
-js_file = os.path.join(frontend_dir, 'apiUtil.js')
-with open(js_file, 'r', encoding='utf-8') as f:
-    js_content_api = f.read()
+js_contents = {}
+for js_file_name in js_files:
+    js_file = os.path.join(frontend_dir, js_file_name)
+    with open(js_file, 'r', encoding='utf-8') as f:
+        js_contents[js_file_name] = f.read()
 
 css_file = os.path.join(frontend_dir, 'style.css')
 with open(css_file, 'r', encoding='utf-8') as f:
     css_content = f.read()
 
-# Inject JS at the end of <body>
-html_content = html_content.replace("</body>", f"<script>{js_content_main} {js_content_api}</script></body>")
+# Remove all script tags from index.html to avoid conflicts
+html_content = html_content.replace('<script src="libs/xlsx.full.min.js" defer></script>', '')
+html_content = html_content.replace('<script src="dateUtil.js" defer></script>', '')
+html_content = html_content.replace('<script src="apiUtil.js" defer></script>', '')
+html_content = html_content.replace('<script src="uiManager.js" defer></script>', '')
+html_content = html_content.replace('<script src="main.js" defer></script>', '')
+
+# Inject all JS files at the end of <body> in correct dependency order
+js_injection = '<script>'
+for js_file_name in js_files:
+    js_injection += js_contents[js_file_name] + '\n'
+js_injection += '</script>'
+
+html_content = html_content.replace("</body>", js_injection + "</body>")
 
 html_content = html_content.replace("</head>", f"<style>{css_content}</style></head>")
 
